@@ -38,3 +38,6 @@ Rscript tcga/03_survival_expression.R
 - Few mutant tumors (expect tens, not hundreds), so power is low. Link this to the power curves above.
 - BRCA1 is also silenced by promoter methylation; "wild-type" tumors may be functionally BRCA1-deficient.
 - Verify GDC/TCGAbiolinks column names (PAM50, clinical fields); they change between releases.
+
+## Methods and background
+See [docs/methods_background.md](docs/methods_background.md) for the statistical background, simulation design and results.
