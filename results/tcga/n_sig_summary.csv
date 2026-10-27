@@ -1,0 +1,9 @@
+"","n_case","n_ctrl","genes_tested","deseq2","edger","limmavoom","all_three"
+"posctrl_basal_vs_lumA",100,100,21139,15151,14960,14545,13304
+"BRCA1_mut_naive",11,302,29082,2210,1195,293,174
+"BRCA1_mut_adjusted",11,302,29436,264,202,2,0
+"BRCA2_mut_naive",7,302,30785,134,100,10,3
+"BRCA2_mut_adjusted",7,302,31374,87,119,21,6
+"BRCA_mut_naive",18,303,28138,1638,1043,31,18
+"BRCA_mut_adjusted",18,303,29407,297,244,2,2
+"BRCA1_basal_only",7,183,29464,55,105,0,0

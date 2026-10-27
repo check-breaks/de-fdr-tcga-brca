@@ -1,0 +1,2 @@
+"design","n_case","n_ctrl","genes_tested","deseq2","edger","limmavoom","p05_deseq2","p05_edger","p05_limmavoom","iter"
+"adjusted",11,303,29144,400,298,2,0.12047076585232,0.103348888278891,0.0553801811693659,1

@@ -1,0 +1,4 @@
+"target","design","tool","n_iter","mean_calls","median_calls","max_calls","frac_iters_with_any_call","mean_frac_raw_p_below_0.05"
+"BRCA1_mut","adjusted","deseq2",1,400,400,400,1,0.12047076585232
+"BRCA1_mut","adjusted","edger",1,298,298,298,1,0.103348888278891
+"BRCA1_mut","adjusted","limmavoom",1,2,2,2,1,0.0553801811693659
