@@ -1,0 +1,9 @@
+"analysis","design","n_draws","mean_calls","min_calls","max_calls","frac_draws_with_any_call"
+"positive_control_basal_vs_lumA","naive",1,14698,14698,14698,1
+"null_pseudo_BRCA1","adjusted",50,0,0,0,0
+"BRCA1_mut","naive",10,0,0,0,0
+"BRCA1_mut","adjusted",10,0,0,0,0
+"BRCA2_mut","naive",10,0,0,0,0
+"BRCA2_mut","adjusted",10,0,0,0,0
+"BRCA_mut","naive",10,0.4,0,2,0.2
+"BRCA_mut","adjusted",10,0,0,0,0

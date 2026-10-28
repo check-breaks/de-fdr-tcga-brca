@@ -1,0 +1,41 @@
+  scenario  n_case             method  reps   fdr  fdr_sd  power  n_called  n_false
+confounded       7    deseq2_adjusted    20 0.051   0.010  0.837    264.80    13.65
+confounded       7       deseq2_naive    20 0.219   0.177  0.804    329.85    88.70
+confounded       7     edger_adjusted    20 0.042   0.011  0.835    261.75    11.15
+confounded       7        edger_naive    20 0.212   0.180  0.796    324.15    85.20
+confounded       7 limmavoom_adjusted    20 0.048   0.013  0.816    257.20    12.50
+confounded       7    limmavoom_naive    20 0.224   0.179  0.779    321.65    88.05
+confounded       7     ttest_adjusted    20 0.049   0.012  0.833    262.90    12.95
+confounded       7        ttest_naive    20 0.145   0.133  0.607    222.75    40.65
+confounded       7  wilcoxon_adjusted    20 0.028   0.012  0.792    244.45     6.85
+confounded       7     wilcoxon_naive    20 0.138   0.169  0.748    276.85    52.40
+confounded      11    deseq2_adjusted    20 0.040   0.012  0.886    276.65    11.00
+confounded      11       deseq2_naive    20 0.364   0.208  0.859    451.60   193.90
+confounded      11     edger_adjusted    20 0.037   0.010  0.886    275.95    10.20
+confounded      11        edger_naive    20 0.357   0.204  0.855    441.90   185.25
+confounded      11 limmavoom_adjusted    20 0.046   0.011  0.871    273.75    12.50
+confounded      11    limmavoom_naive    20 0.362   0.205  0.839    436.90   185.05
+confounded      11     ttest_adjusted    20 0.045   0.013  0.895    281.30    12.80
+confounded      11        ttest_naive    20 0.238   0.218  0.811    364.60   121.20
+confounded      11  wilcoxon_adjusted    20 0.029   0.011  0.879    271.40     7.80
+confounded      11     wilcoxon_naive    20 0.279   0.212  0.850    394.60   139.55
+     mixed       7    deseq2_adjusted    20 0.045   0.011  0.847    266.10    11.90
+     mixed       7       deseq2_naive    20 0.040   0.020  0.799    249.85    10.20
+     mixed       7     edger_adjusted    20 0.043   0.012  0.846    265.15    11.35
+     mixed       7        edger_naive    20 0.034   0.017  0.796    247.30     8.60
+     mixed       7 limmavoom_adjusted    20 0.047   0.014  0.823    259.25    12.20
+     mixed       7    limmavoom_naive    20 0.037   0.022  0.771    240.50     9.10
+     mixed       7     ttest_adjusted    20 0.051   0.008  0.842    266.35    13.60
+     mixed       7        ttest_naive    20 0.082   0.060  0.618    203.65    18.10
+     mixed       7  wilcoxon_adjusted    20 0.027   0.010  0.811    250.20     6.80
+     mixed       7     wilcoxon_naive    20 0.021   0.011  0.752    230.45     4.95
+     mixed      11    deseq2_adjusted    20 0.050   0.015  0.897    283.35    14.30
+     mixed      11       deseq2_naive    20 0.055   0.048  0.862    274.55    15.80
+     mixed      11     edger_adjusted    20 0.046   0.015  0.894    281.05    12.85
+     mixed      11        edger_naive    20 0.046   0.048  0.858    270.35    13.05
+     mixed      11 limmavoom_adjusted    20 0.047   0.014  0.879    276.80    13.10
+     mixed      11    limmavoom_naive    20 0.048   0.052  0.840    265.65    13.50
+     mixed      11     ttest_adjusted    20 0.051   0.015  0.902    285.15    14.50
+     mixed      11        ttest_naive    20 0.071   0.075  0.789    256.90    20.15
+     mixed      11  wilcoxon_adjusted    20 0.034   0.013  0.889    276.05     9.40
+     mixed      11     wilcoxon_naive    20 0.032   0.019  0.850    263.50     8.60
