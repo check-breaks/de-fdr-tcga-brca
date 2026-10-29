@@ -7,14 +7,13 @@ from src.scratch.nbglm import fit_nb_glm, wald_test
 
 root = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else "results/sim")
 for d in sorted(root.glob("n*_rep*")):
-    if (d / "pvals_python.csv").exists(): continue
-    if (d / "pvals_python.csv").exists(): continue
     c = pd.read_csv(d / "counts.csv", index_col=0)
     m = pd.read_csv(d / "meta.csv")
     cond = (m.condition == "B").to_numpy().astype(int)
-    lib = c.sum(axis=0).to_numpy()
-    sf = lib / np.exp(np.mean(np.log(lib)))          # simple depth size factors
-    logcpm = np.log2(c.to_numpy() / lib * 1e6 + 1)
+    lib = c.sum(axis=0).to_numpy(float)
+    x = c.to_numpy(float); okg = (x > 0).all(1); lg = np.log(x[okg])
+    sf = np.exp(np.median(lg - lg.mean(1, keepdims=True), axis=0))   # median-of-ratios size factors
+    logcpm = np.log2(x / (sf * lib.mean()) * 1e6 + 1)
     keep = (c.to_numpy() >= 5).sum(1) >= 2            # basic low-count filter (same idea as filterByExpr)
     X = np.column_stack([np.ones(len(cond)), cond]); off = np.log(sf)
     t0 = time.time()

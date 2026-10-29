@@ -5,3 +5,7 @@ results/tcga/perm/
 *.log
 *.logcd
 __pycache__/
+Rplots.pdf
+check_repo.sh
+results/figures/km_brca1.png
+*.zip
