@@ -219,8 +219,7 @@ tumors drawn at random from the 1,065 tumors wild-type for both genes, with the 
   so the comparison is approximate.
 - This does not match the simulations, where a correctly specified NB model is calibrated. The cause was not tested. A
   plausible candidate is real-data structure the NB model does not capture (outliers, sample-level factors such as tumor purity
-  or proliferation, gene-gene correlation). A test would be to add surrogate variables (SVA) and rerun the null; this has not been
-  done.
+  or proliferation, gene-gene correlation). A partial test with surrogate variables is in section 9.6.
 - The number of calls varies widely between draws (DESeq2 from about 180 to 1,179), so a single run's count is not a stable summary.
 
 ### 9.3 Wilcoxon check: power and null
@@ -283,6 +282,38 @@ The Kaplan-Meier plot with a median split gave log-rank p = 0.37 (1,094 patients
 risk at 10 years, and 11 and 8 at 12 years, so late steps rest on a handful of people.
 Only 11 patients carry a BRCA1 mutation, too few for a survival comparison, so this analysis concerns expression, not mutation.
 
+### 9.6 Surrogate variables on the permutation null
+
+To test whether hidden sample-level structure explains the false calls in section 9.2, five of the ten null draws were rerun with
+surrogate variables (`tcga/06_sva_null.R`): the same pseudo-mutants, the same 150 controls and the same gene filter, with
+`svaseq` estimating the variables from the 10,000 most variable genes while keeping subtype in both models and protecting the
+case/control label. `num.sv` returned 10 in every draw, which is the cap that was set, so the data may call for more.
+Mean over the five draws:
+
+| Method | calls without SVs | calls with 10 SVs | raw p < 0.05 without (%) | raw p < 0.05 with (%) |
+|---|---|---|---|---|
+| DESeq2 | 575 | 402 | 13.1 | 11.5 |
+| edgeR | 497 | 161 | 11.7 | 9.7 |
+| limma-voom | 3.2 | 12.0 | 6.2 | 7.2 |
+| Wilcoxon | 0 | 0 | 4.4 | 5.3 |
+
+- Surrogate variables **reduce but do not remove** the inflation. edgeR's false calls fall by about two thirds and DESeq2's by
+  about 30%, yet both still call hundreds of genes and their raw p-values stay at about twice the expected 5%. The DESeq2 effect
+  is not consistent: it rose in one draw (262 to 298 calls) and fell in another (561 to 346).
+- They made the two well-behaved methods **slightly worse** (limma-voom 3.2 to 12.0 calls; raw p-values 6.2% to 7.2% for
+  limma-voom and 4.4% to 5.3% for Wilcoxon). One possible reason, not tested, is that variables estimated from the same data can
+  correlate with a random label by chance and inflate test statistics. SVA is therefore not a free fix here.
+- The variables relate loosely to known biology. The strongest Spearman correlation of any variable with a marker gene,
+  averaged over draws, was 0.56 for PTPRC (immune cells), 0.49 for MKI67 (proliferation) and 0.42 for KRT19 (epithelial
+  content). This suggests a mixture of immune infiltration, proliferation and tumor content rather than one factor. The marker
+  genes were probably among those used to estimate the variables, so these correlations are somewhat inflated and are not
+  causal evidence.
+- Hidden structure therefore explains part of the inflation, more for edgeR than for DESeq2. What remains is not explained;
+  outliers or heavy-tailed counts are candidates and were not examined.
+- A comparison on the real BRCA1 mutants with surrogate variables was attempted but not completed: the first draw had run for
+  over two hours, against 30 to 40 minutes for a null draw, and was stopped. No real-mutant result with surrogate variables is
+  reported.
+
 ## 10. Limitations
 
 - **Somatic mutations only.** Germline BRCA carriers need controlled-access data (dbGaP) and are missing. "Wild-type" tumors may
@@ -290,14 +321,14 @@ Only 11 patients carry a BRCA1 mutation, too few for a survival comparison, so t
 - **Few mutants** (11 BRCA1, 7 BRCA2 with subtype labels). Power is low, so absence of calls is not absence of effect.
 - **Simulation realism.** The simulations draw from an NB model, favor NB-based tools, and use true effects of at least 0.6 log2
   in 10% of genes, so power figures do not transfer to real BRCA effects.
-- **The cause of the real-data inflation is untested** (see 9.2).
+- **The cause of the real-data inflation is only partly explained:** surrogate variables reduced the false calls but did not remove them (section 9.6), and outliers were not examined.
 - **Additive adjustment.** `subtype + mutation` assumes the mutation effect is the same in every subtype.
 - **Control sampling.** Real-data DE runs used one random draw of about 300 controls; the null used 150. DESeq2 was run with its
   default independent filtering for adjusted p-values.
 - **Follow-up data quality.** Median follow-up is short (about 2.3 years), 21 patients have a recorded time of zero or below, and
   follow-up times come from the latest GDC follow-up record, which may not equal the true last contact.
 - **Replicate counts are modest** (5 balanced and 20 unbalanced simulated datasets per cell, 10 permutation draws).
-- Not implemented: a Snakemake/Nextflow workflow, an SVA analysis, and the other projects in the original plan (scRNA-seq,
+- Not implemented: a Snakemake/Nextflow workflow, and the other projects in the original plan (scRNA-seq,
   mini-GWAS).
 
 ## 11. Lessons from the analysis
@@ -312,6 +343,8 @@ Only 11 patients carry a BRCA1 mutation, too few for a survival comparison, so t
 - **Naive designs can look fine by chance.** With few cases, the naive FDR depends on how the cases fall across subtypes in a given draw.
 
 ## 12. Reproducibility
+
+The same steps are available as a Snakemake workflow (`workflow/Snakefile`; see the README). The commands below run the scripts directly.
 
 ```
 conda env create -f environment.yml && conda activate de-fdr-tcga-brca
@@ -335,6 +368,7 @@ Rscript tcga/01_download_prepare.R     # includes follow-up times (01b_fix_clini
 Rscript tcga/02_confounded_de.R
 Rscript tcga/04_permutation_null.R 10 adjusted BRCA1_mut 150
 Rscript tcga/05_wilcoxon_check.R 50 10 150
+Rscript tcga/06_sva_null.R 5 0 150            # about 35 minutes per draw
 Rscript tcga/03_survival_expression.R
 Rscript tcga/03b_km_plot.R
 

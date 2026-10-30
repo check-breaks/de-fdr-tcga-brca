@@ -1,0 +1,21 @@
+# Tiny configuration for testing the workflow from scratch in a CLEAN COPY of the repository (minutes, not hours).
+# Do not use it in your real checkout: the numbers it produces are not meaningful.
+allow_download: false
+
+sim:
+  n_per_group: [3, 5]
+  reps: 1
+  n_genes: 500
+
+unbal:
+  n_case: [7]
+  n_ctrl: 100
+  reps: 1
+  n_genes: 500
+
+tcga:
+  n_ctrl: 150
+  perm_iters: 10
+  sva_iters: 5
+  wilcoxon_null_draws: 50
+  wilcoxon_control_draws: 10

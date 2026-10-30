@@ -31,7 +31,11 @@ The full methods, tables and limitations are in [docs/methods_background.md](doc
   by random "pseudo-mutants" with the same subtype mix (10 draws), DESeq2 called 513 genes on average and edgeR 389, in every
   draw. limma-voom called 8 on average and a Wilcoxon rank-sum test called none. The real BRCA1 result (264, 202, 2 and 0 genes)
   lies inside these null ranges, so it cannot be distinguished from noise. This did not appear in the clean simulation, and its
-  cause was not tested.
+  cause is only partly explained (next point).
+- **Surrogate variables reduce the false calls but do not remove them.** Rerunning five of the null draws with 10 surrogate
+  variables cut edgeR's mean false calls from 497 to 161 and DESeq2's from 575 to 402, but raw p-values stayed at about twice the
+  expected rate (9.7% and 11.5%), and limma-voom and Wilcoxon became slightly worse. The variables correlate loosely with immune
+  (PTPRC), proliferation (MKI67) and epithelial (KRT19) markers. Hidden structure explains part of the problem, not all of it.
 - **No expression effect of BRCA1/2 somatic mutation was detectable at this sample size.** The Wilcoxon test is calibrated on the
   null and called 14,698 genes in a strong positive control (100 basal vs 100 LumA tumors), yet it found nothing in 7 to 18
   mutants. That limits the claim to "no effect detectable with these numbers", not "no effect".
@@ -41,6 +45,7 @@ The full methods, tables and limitations are in [docs/methods_background.md](doc
 ## Figures
 
 ![Null calls on real data](results/figures/permutation_null.png)
+![Surrogate variables on the null](results/figures/sva_null.png)
 ![Confounded and unbalanced simulation](results/figures/fdr_unbalanced_v2.png)
 ![Balanced simulation](results/figures/fdr_power_v2.png)
 ![Kaplan-Meier, BRCA1 expression](results/figures/km_brca1_v2.png)
@@ -53,6 +58,7 @@ tests/              validation of the from-scratch code (10 tests)
 simulation/         balanced and unbalanced simulators, Python and R methods, evaluation, figures
 tcga/               TCGA-BRCA download, clinical fix, DE, permutation null, Wilcoxon check, survival
 docs/               methods, results and limitations
+workflow/ config/    stage-level Snakemake workflow and its parameters
 results/            summary tables and figures (large intermediate files are git-ignored)
 environment.yml     conda environment (Python and R)
 ```
@@ -77,6 +83,29 @@ The remaining steps (unbalanced simulation, permutation null, Wilcoxon check, su
 [docs/methods_background.md](docs/methods_background.md#12-reproducibility). The permutation null takes about 5 minutes per
 draw on 8 GB of RAM with the default of 150 controls.
 
+## Running it with Snakemake
+
+A stage-level Snakemake workflow (`workflow/Snakefile`, parameters in `config/config.yaml`) wraps the scripts, so each rule
+calls one existing script on a whole folder. From the repository root, inside the conda environment:
+
+```
+snakemake -n                  # dry run: shows what would run
+snakemake -c1                 # simulations, evaluation and figures (default target)
+snakemake -c1 tcga_all        # TCGA-BRCA analysis; needs data/tcga/brca_se.rds
+```
+
+- Use `-c1`: the R jobs need a few GB of RAM each.
+- The TCGA download (about 5 GB) is never run unless you allow it: `--config allow_download=true`. Otherwise a missing
+  `data/tcga/brca_se.rds` stops the workflow with instructions.
+- Existing results count as up to date, so a finished checkout reports "Nothing to be done". The slow, resumable stages write a
+  `.done` flag, so a failed run keeps its finished datasets and a rerun skips them.
+- A quick from-scratch test, in a clean copy of the repository (without `results/` and `data/`):
+  `snakemake -c1 --configfile config/config_small.yaml`. It uses tiny settings, so its numbers are not meaningful. This runs
+  the whole default target in about two minutes. The TCGA rules were checked with dry runs against the existing results and
+  have not been rebuilt from scratch through the workflow.
+- The workflow is stage-level: Snakemake cannot rerun a single simulated dataset, because the scripts loop over datasets
+  themselves. A per-dataset version would need the scripts to accept one dataset at a time.
+
 ## Limitations
 
 - Open-access TCGA data contains **somatic mutations only**; germline carriers (controlled access) are missing, and some
@@ -84,16 +113,16 @@ draw on 8 GB of RAM with the default of 150 controls.
 - With 11 and 7 mutants, power is low. A lack of calls does not show a lack of effect.
 - The simulations draw from a negative binomial model and use true effects of at least 0.6 log2 in 10% of genes, so their power
   figures do not transfer to real BRCA effects.
-- The cause of the real-data inflation in DESeq2 and edgeR was **not tested**; candidates include outliers, sample-level factors
-  such as tumor purity, and gene-gene correlation.
+- The real-data inflation in DESeq2 and edgeR is only **partly explained**: ten surrogate variables reduced it (edgeR by about two
+  thirds, DESeq2 by about 30%) but did not remove it. Outliers were not examined.
 - Replicate counts are modest (5 balanced and 20 unbalanced simulated datasets per cell, 10 permutation draws).
 
 ## Status
 
-Done: the from-scratch statistics, both simulations, the TCGA-BRCA analysis, the permutation null, the Wilcoxon check and the
-survival analysis.
-Not done: a Snakemake workflow, an SVA analysis to test the explanation for the real-data inflation, and the other projects in
-the original plan (single-cell, mini-GWAS).
+Done: the from-scratch statistics, both simulations, the TCGA-BRCA analysis, the permutation null, the Wilcoxon check, the
+survival analysis and a surrogate-variable test of the real-data inflation (without a completed real-mutant comparison).
+A stage-level Snakemake workflow wraps all of the above.
+Not done: a per-dataset Snakemake workflow, and the other projects in the original plan (single-cell, mini-GWAS).
 
 ## Two bugs worth knowing about
 

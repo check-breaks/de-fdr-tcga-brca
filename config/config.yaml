@@ -1,0 +1,20 @@
+# Parameters for workflow/Snakefile. Defaults reproduce the results in docs/methods_background.md.
+allow_download: false        # the TCGA download is large and slow; set true (or pass --config allow_download=true) to let the workflow run it
+
+sim:                         # balanced simulation
+  n_per_group: [3, 5, 10]
+  reps: 5
+  n_genes: 3000
+
+unbal:                       # unbalanced / confounded simulation
+  n_case: [7, 11]
+  n_ctrl: 300
+  reps: 20
+  n_genes: 3000
+
+tcga:
+  n_ctrl: 150                # controls per permutation / Wilcoxon / SVA draw
+  perm_iters: 10             # permutation-null draws (about 5 minutes each on 8 GB of RAM)
+  sva_iters: 5               # draws rerun with surrogate variables (about 35 minutes each)
+  wilcoxon_null_draws: 50
+  wilcoxon_control_draws: 10

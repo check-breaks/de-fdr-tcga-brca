@@ -1,0 +1,4 @@
+n/group= 3  FPR@0.05  true alpha: 0.056   estimated alpha: 0.185
+n/group= 5  FPR@0.05  true alpha: 0.050   estimated alpha: 0.123
+n/group=10  FPR@0.05  true alpha: 0.045   estimated alpha: 0.076
+n/group=20  FPR@0.05  true alpha: 0.043   estimated alpha: 0.060

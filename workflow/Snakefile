@@ -1,0 +1,227 @@
+# Stage-level Snakemake workflow: each rule calls one existing script on a whole folder, so the validated scripts are unchanged.
+#
+# Run from the repository root, inside the activated conda environment (python, Rscript and snakemake on the PATH):
+#   snakemake -n                  dry run: lists what would run, runs nothing
+#   snakemake -c1                 simulations, evaluation and figures (default target; about 1.5 hours from scratch)
+#   snakemake -c1 tcga_all        the TCGA-BRCA analysis; needs data/tcga/brca_se.rds (see rule tcga_data)
+#   snakemake -c1 --forcerun <rule>   recompute one rule
+# Use -c1 (one job at a time): the R jobs need a few GB of RAM each.
+#
+# Existing results are treated as up to date. Rules for resumable scripts (r_unbalanced, python_unbalanced, perm_null, sva_null)
+# write a ".done" flag, so a failed run keeps its finished datasets and a rerun skips them.
+
+from snakemake.exceptions import WorkflowError
+
+configfile: "config/config.yaml"
+
+SIM_N     = config["sim"]["n_per_group"]
+SIM_REPS  = range(config["sim"]["reps"])
+UB_SCEN   = ["mixed", "confounded"]
+UB_NCASE  = config["unbal"]["n_case"]
+UB_REPS   = range(config["unbal"]["reps"])
+SIM_FILES = ["counts.csv", "meta.csv", "truth.csv"]
+
+
+rule all:
+    input:
+        "results/simulation_summary.csv",
+        "results/simulation_unbalanced_summary.csv",
+        "results/calibration_check.txt",
+        "results/figures/fdr_power_v2.png",
+        "results/figures/fdr_unbalanced_v2.png",
+
+
+rule tcga_all:
+    input:
+        "results/tcga/n_sig_summary.csv",
+        "results/tcga/wilcoxon_check_summary.csv",
+        "results/tcga/permutation_null_summary_BRCA1_mut.csv",
+        "results/tcga/sva_null_summary.csv",
+        "results/tcga/cox_sensitivity.txt",
+        "results/figures/permutation_null.png",
+        "results/figures/sva_null.png",
+        "results/figures/brca1_by_subtype.png",
+        "results/figures/km_brca1_v2.png",
+
+
+# ---------------------------------------------------------------- balanced simulation
+rule simulate:
+    output:
+        expand("results/sim/n{n}_rep{r}/{f}", n=SIM_N, r=SIM_REPS, f=SIM_FILES),
+    params:
+        n=" ".join(map(str, SIM_N)),
+        reps=config["sim"]["reps"],
+        genes=config["sim"]["n_genes"],
+    log: "logs/simulate.log"
+    shell:
+        "python simulation/simulate.py --out results/sim --n_per_group {params.n} --reps {params.reps} "
+        "--n_genes {params.genes} > {log} 2>&1"
+
+
+rule python_methods:
+    input: rules.simulate.output
+    output: expand("results/sim/n{n}_rep{r}/pvals_python.csv", n=SIM_N, r=SIM_REPS)
+    log: "logs/python_methods.log"
+    shell: "python simulation/run_python_methods.py results/sim > {log} 2>&1"
+
+
+rule r_methods:
+    input: rules.simulate.output
+    output: expand("results/sim/n{n}_rep{r}/pvals_r.csv", n=SIM_N, r=SIM_REPS)
+    log: "logs/r_methods.log"
+    shell: "Rscript simulation/run_r_methods.R results/sim > {log} 2>&1"
+
+
+rule evaluate_balanced:
+    input:
+        rules.python_methods.output,
+        rules.r_methods.output,
+    output:
+        "results/simulation_summary.csv",
+        "results/simulation_results_raw.csv",
+    log: "logs/evaluate_balanced.log"
+    shell: "mkdir -p results/figures && python simulation/evaluate.py results/sim > {log} 2>&1"
+
+
+rule calibration_check:
+    output: "results/calibration_check.txt"
+    log: "logs/calibration_check.log"
+    shell: "python simulation/calibration_check.py > {output} 2> {log}"
+
+
+# ---------------------------------------------------------------- unbalanced / confounded simulation
+rule simulate_unbalanced:
+    output:
+        expand("results/sim_unbal/{sc}_n{nc}_rep{r}/{f}", sc=UB_SCEN, nc=UB_NCASE, r=UB_REPS, f=SIM_FILES),
+    params:
+        nc=" ".join(map(str, UB_NCASE)),
+        ctrl=config["unbal"]["n_ctrl"],
+        reps=config["unbal"]["reps"],
+        genes=config["unbal"]["n_genes"],
+    log: "logs/simulate_unbalanced.log"
+    shell:
+        "python simulation/simulate_unbalanced.py --out results/sim_unbal --n_case {params.nc} --n_ctrl {params.ctrl} "
+        "--reps {params.reps} --n_genes {params.genes} > {log} 2>&1"
+
+
+rule r_unbalanced:                       # resumable: skips datasets that already have pvals_r.csv
+    input: rules.simulate_unbalanced.output
+    output: touch("results/sim_unbal/.r_done")
+    log: "logs/r_unbalanced.log"
+    shell: "Rscript simulation/run_r_unbalanced.R results/sim_unbal > {log} 2>&1"
+
+
+rule python_unbalanced:
+    input: rules.simulate_unbalanced.output
+    output: touch("results/sim_unbal/.py_done")
+    log: "logs/python_unbalanced.log"
+    shell: "python simulation/run_fast_unbalanced.py results/sim_unbal > {log} 2>&1"
+
+
+rule evaluate_unbalanced:
+    input:
+        "results/sim_unbal/.r_done",
+        "results/sim_unbal/.py_done",
+    output: "results/simulation_unbalanced_summary.csv"
+    log: "logs/evaluate_unbalanced.log"
+    shell: "mkdir -p results/figures && python simulation/evaluate_unbalanced.py results/sim_unbal > {log} 2>&1"
+
+
+rule figures_sim:
+    input:
+        "results/simulation_results_raw.csv",
+        "results/simulation_unbalanced_summary.csv",
+    output:
+        "results/figures/fdr_power_v2.png",
+        "results/figures/fdr_unbalanced_v2.png",
+    log: "logs/figures_sim.log"
+    shell: "python simulation/make_figures.py results > {log} 2>&1"
+
+
+# ---------------------------------------------------------------- TCGA-BRCA (optional)
+rule tcga_data:                          # NOT run automatically unless allowed: about 5 GB and hours of download
+    output: "data/tcga/brca_se.rds"
+    run:
+        if not config["allow_download"]:
+            raise WorkflowError(
+                "data/tcga/brca_se.rds is missing. Build it with 'Rscript tcga/01_download_prepare.R' (about 5 GB, hours), "
+                "or rerun with --config allow_download=true to let the workflow do it.")
+        shell("Rscript tcga/01_download_prepare.R")
+
+
+rule tcga_de:
+    input: ancient("data/tcga/brca_se.rds")
+    output: "results/tcga/n_sig_summary.csv"
+    log: "logs/tcga_de.log"
+    shell: "Rscript tcga/02_confounded_de.R > {log} 2>&1"
+
+
+rule perm_null:                          # resumable: finished draws are skipped
+    input: ancient("data/tcga/brca_se.rds")
+    output:
+        touch("results/tcga/perm/.done"),
+        "results/tcga/permutation_null_summary_BRCA1_mut.csv",
+    params:
+        n=config["tcga"]["perm_iters"],
+        ctrl=config["tcga"]["n_ctrl"],
+    log: "logs/perm_null.log"
+    shell: "Rscript tcga/04_permutation_null.R {params.n} adjusted BRCA1_mut {params.ctrl} > {log} 2>&1"
+
+
+rule wilcoxon_check:
+    input: ancient("data/tcga/brca_se.rds")
+    output: "results/tcga/wilcoxon_check_summary.csv"
+    params:
+        nnull=config["tcga"]["wilcoxon_null_draws"],
+        ndraws=config["tcga"]["wilcoxon_control_draws"],
+        ctrl=config["tcga"]["n_ctrl"],
+    log: "logs/wilcoxon_check.log"
+    shell: "Rscript tcga/05_wilcoxon_check.R {params.nnull} {params.ndraws} {params.ctrl} > {log} 2>&1"
+
+
+rule sva_null:                           # resumable; pairs its draws with those of perm_null
+    input:
+        ancient("data/tcga/brca_se.rds"),
+        "results/tcga/perm/.done",
+    output:
+        touch("results/tcga/sva/.done"),
+        "results/tcga/sva_null_summary.csv",
+    params:
+        n=config["tcga"]["sva_iters"],
+        ctrl=config["tcga"]["n_ctrl"],
+    log: "logs/sva_null.log"
+    shell: "Rscript tcga/06_sva_null.R {params.n} 0 {params.ctrl} > {log} 2>&1"
+
+
+rule survival:
+    input: ancient("data/tcga/brca_se.rds")
+    output: "results/figures/brca1_by_subtype.png"
+    log: "logs/survival.log"
+    shell: "Rscript tcga/03_survival_expression.R > {log} 2>&1"
+
+
+rule km_plot:
+    input: ancient("data/tcga/brca_se.rds")
+    output: "results/figures/km_brca1_v2.png"
+    log: "logs/km_plot.log"
+    shell: "Rscript tcga/03b_km_plot.R > {log} 2>&1"
+
+
+rule cox_sensitivity:
+    input: ancient("data/tcga/brca_se.rds")
+    output: "results/tcga/cox_sensitivity.txt"
+    log: "logs/cox_sensitivity.log"
+    shell: "Rscript tcga/03c_cox_sensitivity.R > {output} 2> {log}"
+
+
+rule figures_tcga:
+    input:
+        "results/tcga/perm/.done",
+        "results/tcga/sva/.done",
+        "results/tcga/n_sig_summary.csv",
+        "results/tcga/wilcoxon_check_summary.csv",
+    output:
+        "results/figures/permutation_null.png",
+        "results/figures/sva_null.png",
+    log: "logs/figures_tcga.log"
+    shell: "python simulation/make_figures.py results > {log} 2>&1"

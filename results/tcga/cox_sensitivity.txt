@@ -1,0 +1,4 @@
+patients with time <= 0: 21 
+(a) all patients with a time                   n=1036 events=144  BRCA1 HR 1.15 (0.96 to 1.38), p = 0.126
+(b) excluding time <= 0                        n=1016 events=142  BRCA1 HR 1.15 (0.96 to 1.38), p = 0.139
+(c) excluding time <= 0, strata(subtype)       n=1016 events=142  BRCA1 HR 1.14 (0.94 to 1.36), p = 0.176

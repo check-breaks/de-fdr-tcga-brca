@@ -9,3 +9,8 @@ Rplots.pdf
 check_repo.sh
 results/figures/km_brca1.png
 *.zip
+logs/
+.snakemake/
+results/figures/fdr_power.png
+results/figures/fdr_unbalanced.png
+results/tcga/sva/

@@ -5,7 +5,7 @@ Inputs (any missing input is skipped with a message):
   results/simulation_unbalanced_summary.csv     (evaluate_unbalanced.py)
   results/tcga/perm/BRCA1_mut_iter*.csv         (tcga/04_permutation_null.R)
   results/tcga/n_sig_summary.csv, results/tcga/wilcoxon_check_summary.csv   (real BRCA1 result, for the marker)
-Outputs: results/figures/fdr_power_v2.png, fdr_unbalanced_v2.png, permutation_null.png
+Outputs: results/figures/fdr_power_v2.png, fdr_unbalanced_v2.png, permutation_null.png, sva_null.png
 """
 import sys, glob, pathlib, textwrap
 import numpy as np, pandas as pd, matplotlib
@@ -101,7 +101,39 @@ def fig_perm():
     plt.tight_layout(rect=(0, 0.07, 1, 1)); plt.savefig(FIG / "permutation_null.png", dpi=170); plt.close()
 
 
-for fn in (fig_fdr_power, fig_unbalanced, fig_perm):
+def fig_sva():
+    bf = [pd.read_csv(f) for f in sorted(glob.glob(str(R / "tcga/perm/BRCA1_mut_iter*.csv")))]
+    bf = [b for b in bf if "wilcoxon" in b.columns]
+    sf = [pd.read_csv(f) for f in sorted(glob.glob(str(R / "tcga/sva/BRCA1_mut_null_iter*.csv")))]
+    if not bf or not sf: return print("skip sva: need results/tcga/perm and results/tcga/sva files")
+    base = pd.concat(bf); base = base[base.design == "adjusted"]
+    j = base.merge(pd.concat(sf), on="iter", suffixes=("_base", "_sva"))
+    rf = [pd.read_csv(f) for f in sorted(glob.glob(str(R / "tcga/sva/BRCA1_mut_real_iter*.csv")))]
+    real = pd.concat(rf) if rf else None
+    tools = ["deseq2", "edger", "limmavoom", "wilcoxon"]; dx = 0.18
+    fig, ax = plt.subplots(1, 2, figsize=(11, 4.6))
+    for i, t in enumerate(tools):
+        for a, col, scale in ((ax[0], t, 1), (ax[1], f"p05_{t}", 100)):
+            for _, r in j.iterrows():
+                a.plot([i - dx, i + dx], [scale * r[f"{col}_base"], scale * r[f"{col}_sva"]], c=COL[t], alpha=0.45, lw=1)
+            a.scatter(np.full(len(j), i - dx), scale * j[f"{col}_base"], c=COL[t], s=24, zorder=3)
+            a.scatter(np.full(len(j), i + dx), scale * j[f"{col}_sva"], c=COL[t], marker="s", s=24, zorder=3)
+        if real is not None and real[t].notna().any():
+            ax[0].scatter(np.full(real[t].notna().sum(), i + dx + 0.12), real[t].dropna(), marker="D", c="red", edgecolor="k", s=55, zorder=5,
+                          label="real BRCA1 mutants, with SVs" if i == 0 else None)
+    ax[0].set_yscale("symlog", linthresh=1); ax[0].set_ylim(-0.3, None); ax[0].set_yticks([0, 1, 10, 100, 1000]); ax[0].set_yticklabels(["0", "1", "10", "100", "1000"])
+    ax[0].set_ylabel("genes called at q < 0.05 (log-ish scale)"); ax[0].set_title(f"False calls per draw (n = {len(j)} paired draws)")
+    ax[1].axhline(5, ls="--", c="k", lw=1); ax[1].set_ylabel("% of raw p-values < 0.05"); ax[1].set_title("Calibration (expected 5%)")
+    for a in ax: a.set_xticks(range(len(tools))); a.set_xticklabels([NICE[t] for t in tools])
+    if real is not None: ax[0].legend(frameon=False, loc="upper right")
+    nsv = int(pd.concat(sf).n_sv.max())
+    cap(fig, f"Same pseudo-mutant draws without (circles, left) and with {nsv} surrogate variables (squares, right); each line is one draw. "
+             "Subtype-adjusted in both. " + ("The estimated number of surrogate variables hit the cap of 10 in every draw."
+             if (pd.concat(sf).n_sv == 10).all() else f"Surrogate variables per draw: {', '.join(map(str, pd.concat(sf).n_sv.astype(int)))}."))
+    plt.tight_layout(rect=(0, 0.07, 1, 1)); plt.savefig(FIG / "sva_null.png", dpi=170); plt.close()
+
+
+for fn in (fig_fdr_power, fig_unbalanced, fig_perm, fig_sva):
     try: fn()
     except Exception as e: print(f"{fn.__name__} failed: {e!r}")
 print("figures in", FIG)

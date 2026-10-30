@@ -1,0 +1,5 @@
+"tool","n_paired","mean_calls_without_sva","mean_calls_with_sva","mean_pct_p05_without_sva","mean_pct_p05_with_sva"
+"deseq2",5,575,401.6,13.0650733468503,11.5274328642746
+"edger",5,497.2,160.8,11.7173146227936,9.71432241023622
+"limmavoom",5,3.2,12,6.17748720361802,7.23184881870117
+"wilcoxon",5,0,0,4.36829512757167,5.30622428568254
