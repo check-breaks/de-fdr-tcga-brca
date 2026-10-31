@@ -314,6 +314,97 @@ Mean over the five draws:
   over two hours, against 30 to 40 minutes for a null draw, and was stopped. No real-mutant result with surrogate variables is
   reported.
 
+### 9.7 PCA and quality control
+
+`tcga/07_pca_qc.R` ran a principal component analysis (PCA) of all 1,095 tumors: genes with CPM above 1 in at least 20 tumors
+(21,915 of 60,660), log2-CPM, then the 500 most variable genes. The table gives the share of variance in each component and the
+R-squared of a linear model of that component on PAM50 subtype and on tissue source site (the two-letter code in the patient ID).
+
+| Component | % of variance | R-squared, subtype | R-squared, site |
+|---|---|---|---|
+| PC1 | 19.6 | 0.67 | 0.05 |
+| PC2 | 11.3 | 0.30 | 0.06 |
+| PC3 | 5.3 | 0.30 | 0.12 |
+| PC4 | 3.9 | 0.31 | 0.04 |
+| PC5 | 2.3 | 0.05 | 0.03 |
+
+- Subtype is the largest single source of variation: basal tumors separate from luminal tumors along PC1. The BRCA1 mutants fall
+  mostly inside the basal cluster, which is the confounding of section 9.1 shown as a picture (`results/figures/pca_subtype_site.png`).
+- Tissue source site shows no visible pattern. Its R-squared values are small, but a label with many small groups gets a few
+  percent by chance, so they should not be read as a real site effect.
+- The sample names in the stored object are patient IDs, so **sequencing plate could not be checked**. No site structure does not
+  rule out a plate effect.
+- The PCA shows structure in the data. It does not show that this structure causes the inflation in section 9.2, because
+  shuffled labels are unrelated to subtype.
+
+### 9.8 Does group size or subtype mixing explain the inflation?
+
+Under the null, about 5% of genes should have a raw p-value below 0.05. This fraction is steadier than the number of calls, which
+varied from 407 to 1,179 for DESeq2 across draws. `tcga/04b_permutation_groupsize.R` changes the number of pseudo-mutants and
+controls, and `tcga/04d_permutation_single_subtype.R` draws both groups from one subtype (LumA, wild-type tumors only, so no
+subtype term is needed). The controls are 43 rather than 40 because the script rounds up within each subtype.
+
+| Setting (subtype-adjusted design) | Draws | DESeq2 | edgeR | limma-voom | Wilcoxon |
+|---|---|---|---|---|---|
+| 11 cases, 150 controls (section 9.2) | 10 | 0.128 | 0.113 | 0.061 | 0.047 |
+| 11 cases, 43 controls | 3 | 0.125 | 0.113 | 0.063 | 0.049 |
+| 22 cases, 153 controls | 3 | 0.134 | 0.126 | 0.059 | 0.040 |
+| LumA only, 11 cases, 150 controls (no subtype term) | 3 | 0.109 | 0.093 | 0.048 | 0.049 |
+
+Mean number of calls at 5% FDR: DESeq2 513, 539, 522 and 217; edgeR 389, 366, 604 and 234; limma-voom 8, 0.3, 0 and 1.7;
+Wilcoxon 0 in all four.
+
+- Doubling the cases or cutting the controls to about a quarter barely changes the raw p-value fractions. The inflation is
+  therefore **not a small-sample effect of the kind seen in section 6**, which should shrink as groups grow.
+- Holding subtype constant lowered the DESeq2 and edgeR fractions somewhat (0.128 to 0.109 and 0.113 to 0.093), but they stay
+  about twice the expected rate. Subtype mixing may contribute; it does not explain the whole effect.
+- Each extra setting has only 3 draws and individual draws differ a lot (LumA DESeq2: 0.145, 0.090, 0.092), so these are first
+  looks. A 400-control run was planned and not done.
+
+### 9.9 Per-gene p-value diagnostics on one shuffled draw
+
+`tcga/04c_pvalue_diagnostics.R` repeats draw 1 of section 9.2 (same seed; its raw p < 0.05 fractions of 0.106, 0.095, 0.042 and
+0.040 match the original run) and saves every gene's p-value, expression level and DESeq2 dispersion. Raw p < 0.05 by expression
+quintile (Q1 lowest):
+
+| Quintile | DESeq2 | edgeR | limma-voom | Wilcoxon |
+|---|---|---|---|---|
+| Q1 | 0.103 | 0.116 | 0.046 | 0.054 |
+| Q2 | 0.128 | 0.113 | 0.044 | 0.043 |
+| Q3 | 0.138 | 0.116 | 0.042 | 0.038 |
+| Q4 | 0.087 | 0.072 | 0.040 | 0.033 |
+| Q5 | 0.072 | 0.059 | 0.036 | 0.031 |
+
+- The excess is not confined to the lowest-count genes. It is largest in the low and middle quintiles and smaller, though
+  still present for DESeq2, in the most highly expressed genes.
+- Median DESeq2 dispersion (final estimate) was higher for genes with raw p < 0.05 than for the others within every quintile:
+  1.24 against 1.04 (Q1), 1.09 against 0.67 (Q2), 0.94 against 0.58 (Q3), 0.28 against 0.245 (Q4) and 0.21 against 0.17 (Q5).
+  The false calls therefore come disproportionately from genes whose counts vary more between tumors.
+- With about 160 samples, DESeq2's final dispersion is almost identical to the per-gene estimate, so shrinkage toward the trend
+  does little here. This argues against the section 4 explanation (unreliable per-gene dispersion at small n) for this inflation.
+- DESeq2 and edgeR rank genes almost identically (Spearman correlation of p-values 0.96); limma-voom and Wilcoxon agree more with
+  each other (0.81) than with either (0.52 to 0.60).
+- This is **one draw, and an association, not a demonstrated mechanism**. One explanation is that the single dispersion per gene
+  shared by cases and controls misjudges the variance of a small, mostly basal case group; another is that noisy genes catch
+  extreme samples by chance. Neither was tested. Draw 1 was also milder than average (262 DESeq2 calls against a mean of 513).
+
+### 9.10 Positive control: basal against LumA
+
+To check that the pipeline finds real signal, `tcga/02_confounded_de.R` compared 100 basal with 100 LumA tumors (basal = case,
+no confounder), and `tcga/08_volcano_upset.R` plots the saved table (`results/figures/volcano_basal_vs_lumA.png` and
+`upset_basal_vs_lumA.png`). Wilcoxon results are not in this table, so the overlap covers three tools.
+
+- At q < 0.05, DESeq2, edgeR and limma-voom called 15,151, 14,960 and 14,545 genes; 13,304 genes were called by all three. The
+  other groups were: DESeq2 and edgeR only 1,438; limma-voom only 951; DESeq2 and limma-voom only 235; DESeq2 only 174;
+  edgeR only 163; edgeR and limma-voom only 55.
+- Known markers have the expected direction (positive log fold change = higher in basal): FOXC1 +4.0, SOX10 +4.5, KRT17 +2.6,
+  KRT5 +2.7 and KRT14 +2.2 are higher in basal; ESR1 -6.0, PGR -6.5, FOXA1 -5.4, GATA3 -3.6 and XBP1 -3.2 are higher in LumA.
+  All have DESeq2 q-values below 1e-10.
+- The over-calling on shuffled labels is therefore a calibration problem, not a failure to detect large real differences.
+- About half of all tested genes are called, so "q < 0.05" says little about which tool is more liberal; the permutation
+  results are the better evidence for that. The log fold change column is used as saved in the file, and I did not check which
+  tool it comes from.
+
 ## 10. Limitations
 
 - **Somatic mutations only.** Germline BRCA carriers need controlled-access data (dbGaP) and are missing. "Wild-type" tumors may
@@ -321,15 +412,18 @@ Mean over the five draws:
 - **Few mutants** (11 BRCA1, 7 BRCA2 with subtype labels). Power is low, so absence of calls is not absence of effect.
 - **Simulation realism.** The simulations draw from an NB model, favor NB-based tools, and use true effects of at least 0.6 log2
   in 10% of genes, so power figures do not transfer to real BRCA effects.
-- **The cause of the real-data inflation is only partly explained:** surrogate variables reduced the false calls but did not remove them (section 9.6), and outliers were not examined.
+- **The cause of the real-data inflation is only partly explained:** surrogate variables reduced the false calls but did not remove them (section 9.6), holding subtype constant lowered them slightly (section 9.8), and group size does not explain them. Outlier samples and tumor purity were not examined.
+- **Few draws in the follow-up tests.** The group-size and single-subtype settings use 3 draws each and the per-gene diagnostics use one, so they are first looks.
+- **PCA colours by site, not plate.** The stored sample names are patient IDs (section 9.7).
+- **Simulation parameters.** Dispersion and effect size were not varied in the simulations, only sample size and case counts.
 - **Additive adjustment.** `subtype + mutation` assumes the mutation effect is the same in every subtype.
 - **Control sampling.** Real-data DE runs used one random draw of about 300 controls; the null used 150. DESeq2 was run with its
   default independent filtering for adjusted p-values.
 - **Follow-up data quality.** Median follow-up is short (about 2.3 years), 21 patients have a recorded time of zero or below, and
   follow-up times come from the latest GDC follow-up record, which may not equal the true last contact.
 - **Replicate counts are modest** (5 balanced and 20 unbalanced simulated datasets per cell, 10 permutation draws).
-- Not implemented: a Snakemake/Nextflow workflow, and the other projects in the original plan (scRNA-seq,
-  mini-GWAS).
+- Not done: a per-dataset Snakemake workflow, adding the newer diagnostic scripts (sections 9.7 to 9.10) to the workflow, a
+  test of outliers and tumor purity as causes of the inflation, a sweep over dispersion and effect size, and pathway enrichment.
 
 ## 11. Lessons from the analysis
 
@@ -341,6 +435,8 @@ Mean over the five draws:
   (`follow_ups`) than the one first queried. Fixing the query gave 1,036 patients with 144 events, and the sign of the BRCA1
   hazard ratio flipped (0.88 to 1.15), illustrating the bias of analyzing only the patients who died.
 - **Naive designs can look fine by chance.** With few cases, the naive FDR depends on how the cases fall across subtypes in a given draw.
+- **Test an explanation before accepting it.** The small-sample dispersion story from the simulations (section 4) was a natural explanation for the real-data inflation. Changing the group sizes did not change the inflation, so that explanation does not fit, and the cause remains open.
+- **Use the raw p-value fraction when call counts are noisy.** The share of genes with p < 0.05 on shuffled labels (expected 0.05) was far steadier across draws than the number of FDR calls.
 
 ## 12. Reproducibility
 
@@ -371,6 +467,11 @@ Rscript tcga/05_wilcoxon_check.R 50 10 150
 Rscript tcga/06_sva_null.R 5 0 150            # about 35 minutes per draw
 Rscript tcga/03_survival_expression.R
 Rscript tcga/03b_km_plot.R
+Rscript tcga/07_pca_qc.R                                              # PCA by subtype and tissue source site
+Rscript tcga/04b_permutation_groupsize.R 3 adjusted BRCA1_mut 150 2   # args: draws, design, target, controls, case-scale
+Rscript tcga/04c_pvalue_diagnostics.R 1                               # per-gene p-values of one shuffled draw
+Rscript tcga/04d_permutation_single_subtype.R 3 LumA 11 150           # args: draws, subtype, cases, controls
+Rscript tcga/08_volcano_upset.R                                       # volcano and overlap plots, basal vs LumA
 
 # figures
 python simulation/make_figures.py
