@@ -3,7 +3,6 @@ results/sim/
 results/sim_unbal/
 results/tcga/perm/
 *.log
-*.logcd
 __pycache__/
 Rplots.pdf
 check_repo.sh
@@ -14,3 +13,6 @@ logs/
 results/figures/fdr_power.png
 results/figures/fdr_unbalanced.png
 results/tcga/sva/
+
+MANIFEST.txt
+desktop.ini
