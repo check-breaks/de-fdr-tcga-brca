@@ -16,3 +16,5 @@ results/tcga/sva/
 
 MANIFEST.txt
 desktop.ini
+results/tcga/perm_size/
+results/tcga/perm_single/
