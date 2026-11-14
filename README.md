@@ -166,7 +166,10 @@ snakemake -c1 tcga_all        # TCGA-BRCA analysis; needs data/tcga/brca_se.rds
   site structure does not rule out a plate effect.
 - The overlap plot covers DESeq2, edgeR and limma-voom only; at q < 0.05 about half of all genes are called in the basal vs LumA
   comparison, so the overlap says little about which tool is more liberal.
+- edgeR was run with the quasi-likelihood F-test. Adding robust = TRUE to glmQLFit did not change the permutation-null rate (p < 0.05 in 11.33% 
+  of genes before and after, 10 draws), so the inflation is not explained by the test type or this option.
 - Replicate counts are modest (5 balanced and 20 unbalanced simulated datasets per cell, 10 permutation draws).
+
 
 ## Status
 
