@@ -1,0 +1,5 @@
+old <- do.call(rbind, lapply(list.files("backup/perm_original", full.names=TRUE), read.csv))
+new <- do.call(rbind, lapply(list.files("results/tcga/perm", pattern="BRCA1_mut_iter", full.names=TRUE), read.csv))
+cols <- c("p05_deseq2","p05_edger","p05_limmavoom","p05_wilcoxon")
+print(rbind(old = colMeans(old[, cols]), new = colMeans(new[, cols])))
+cat("rows old/new:", nrow(old), nrow(new), "\n")

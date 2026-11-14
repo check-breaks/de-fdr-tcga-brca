@@ -48,7 +48,7 @@ fit_one <- function(idx, m, design) {
 
   t0 <- Sys.time()
   y <- calcNormFactors(DGEList(cm)); yd <- estimateDisp(y, des)
-  e <- glmQLFTest(glmQLFit(yd, des), coef = "grpcase")$table
+  e <- glmQLFTest(glmQLFit(yd, des, robust = TRUE), coef = "grpcase")$table
   s_edger <- secs(t0)
 
   t0 <- Sys.time()
